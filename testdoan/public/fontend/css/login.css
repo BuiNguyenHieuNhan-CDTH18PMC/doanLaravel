@@ -1,0 +1,32 @@
+body{
+    height: 100vh;
+}
+.container{
+    height: 100vh;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card{
+    width: 500px;
+}
+.card-title{
+    text-align: center;
+}
+
+.registerSection .card{
+    width: 500px; 
+}
+ 
+.registerSection .card-title{
+    text-align: center;
+}
+
+.infomationSection .card{
+    width: 500px; 
+}
+
+.infomationSection .card-title{
+    text-align: center;
+} 
