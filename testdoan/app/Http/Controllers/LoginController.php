@@ -13,8 +13,9 @@ class LoginController extends Controller
     {
         if (isset($request->taikhoan, $request->matkhau)) {
             if (trim($request->taikhoan) && $request->matkhau) {
-                if (DB::table('taikhoan')->where('TAIKHOAN', $request->taikhoan)->where('MATKHAU', md5($request->matkhau))->first()) {
+                if ($result = DB::table('taikhoan')->where('TAIKHOAN', $request->taikhoan)->where('MATKHAU', md5($request->matkhau))->first()) {
                     Session::put('TK', $request->taikhoan);
+                    Session::put('MANGDUNG',DB::table('nguoidung')->where('MATK',$result->MATK)->value('MANGDUNG'));
                     return redirect('/dashboard');
                 }
             }

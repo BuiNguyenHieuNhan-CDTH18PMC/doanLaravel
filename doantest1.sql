@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1:3306
--- Thời gian đã tạo: Th4 03, 2023 lúc 12:00 PM
+-- Thời gian đã tạo: Th4 07, 2023 lúc 06:43 PM
 -- Phiên bản máy phục vụ: 5.7.36
 -- Phiên bản PHP: 7.0.33
 
@@ -30,16 +30,21 @@ SET time_zone = "+00:00";
 
 DROP TABLE IF EXISTS `cauhoi`;
 CREATE TABLE IF NOT EXISTS `cauhoi` (
-  `MACAUHOI` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `MACAUHOI` int(11) NOT NULL AUTO_INCREMENT,
   `NOIDUNG` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `GHICHU` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `MANGDUNG` int(11) NOT NULL,
-  `MALOAI` int(11) NOT NULL,
   `MAMON` int(11) DEFAULT NULL,
   `DOKHO` int(11) NOT NULL,
-  `MADAPAN` int(11) NOT NULL,
   PRIMARY KEY (`MACAUHOI`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `cauhoi`
+--
+
+INSERT INTO `cauhoi` (`MACAUHOI`, `NOIDUNG`, `GHICHU`, `MANGDUNG`, `MAMON`, `DOKHO`) VALUES
+(1, '1 + 1 = ?', 'Test', 1, 2, 3);
 
 -- --------------------------------------------------------
 
@@ -51,8 +56,47 @@ DROP TABLE IF EXISTS `dapan`;
 CREATE TABLE IF NOT EXISTS `dapan` (
   `MADAPAN` int(11) NOT NULL AUTO_INCREMENT,
   `NOIDUNG` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `KIEUDAPAN` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `KIEUDAPAN` int(11) NOT NULL,
+  `MACAUHOI` int(11) NOT NULL,
   PRIMARY KEY (`MADAPAN`)
+) ENGINE=MyISAM AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `dapan`
+--
+
+INSERT INTO `dapan` (`MADAPAN`, `NOIDUNG`, `KIEUDAPAN`, `MACAUHOI`) VALUES
+(1, '1', 0, 1),
+(2, '2', 0, 1),
+(3, '3', 0, 1),
+(4, '4', 0, 1);
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `de`
+--
+
+DROP TABLE IF EXISTS `de`;
+CREATE TABLE IF NOT EXISTS `de` (
+  `MADE` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `TENDE` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `THOIGIAN` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `SL` int(11) NOT NULL,
+  `TRANGTHAI` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`MADE`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `de_cauhoi`
+--
+
+DROP TABLE IF EXISTS `de_cauhoi`;
+CREATE TABLE IF NOT EXISTS `de_cauhoi` (
+  `MADE` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `MACAUHOI` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -74,19 +118,6 @@ CREATE TABLE IF NOT EXISTS `ketqua` (
 -- --------------------------------------------------------
 
 --
--- Cấu trúc bảng cho bảng `loaicauhoi`
---
-
-DROP TABLE IF EXISTS `loaicauhoi`;
-CREATE TABLE IF NOT EXISTS `loaicauhoi` (
-  `MALOAI` int(11) NOT NULL AUTO_INCREMENT,
-  `TENLOAI` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`MALOAI`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
 -- Cấu trúc bảng cho bảng `monhoc`
 --
 
@@ -95,7 +126,14 @@ CREATE TABLE IF NOT EXISTS `monhoc` (
   `MAMON` int(11) NOT NULL AUTO_INCREMENT,
   `TENMON` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`MAMON`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `monhoc`
+--
+
+INSERT INTO `monhoc` (`MAMON`, `TENMON`) VALUES
+(2, 'CNTT');
 
 -- --------------------------------------------------------
 

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\AdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,3 +45,15 @@ Route::get('/dashboard', function () {
 Route::get('/form-diencauhoi', function () {
     return view('server.form_diencauhoi');
 });
+Route::post('/form-diencauhoi', [AdminController::class,'addCauhoi']);
+
+Route::get('/danh-sach-cau-hoi', [AdminController::class,'showcauhoi']);
+//Môn học
+Route::get('/form-monhoc', function () {
+    return view('server.form_monhoc');
+});
+Route::post('/form-monhoc',[AdminController::class,'addMonhoc']);
+Route::get('/danh-sach-mon',[AdminController::class,'showMonhoc']);
+Route::get('/edit-mon/{id}',[AdminController::class,'showeditMonhoc']);
+Route::post('/edit-mon/{id}',[AdminController::class,'editMonhoc']);
+Route::get('/delete-mon/{id}',[AdminController::class,'delMonhoc']);

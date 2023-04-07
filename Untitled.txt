@@ -1,0 +1,1284 @@
+/*                                               
+Author :Admin                          
+Báo cáo doanh thu Tổng th?                                                       
+*/                                            
+ALTER PROC dbo.sp_Ret_ReportRevenueForAll    
+    @LstBranchId VARCHAR(MAX) = NULL ,    
+    @SystemKey NVARCHAR(200) = NULL ,    
+    @FromDate DATETIME ,    
+    @ToDate DATETIME ,    
+    @BustId INT = 1 ,    
+    @CounterId INT = NULL ,    
+    @TkeShift SMALLINT = NULL ,    
+    @AreID INT = NULL ,    
+    @FindByTimes BIT = 0 ,    
+    @isVirtual BIT , /*Null: All,1: ảo,0: thực*/    
+    @UserId INT ,    
+    @Culture INT    
+AS     
+    DECLARE @BustName NVARCHAR(200) = '' ,    
+        @CultureId1 BIGINT= NULL ,    
+        @CultureId2 BIGINT= NULL ,    
+        @CultureId3 BIGINT= NULL ,    
+        @Tienhang DECIMAL(18, 5)  = 0 ,    
+        @DiscountVIP DECIMAL(18, 5)  = 0 ,    
+        @DiscountVIPCount INT  = 0 ,    
+        @OtherDiscount DECIMAL(18, 5)  = 0 ,    
+        @OtherDiscountCount INT  = 0 ,    
+        @Tienmat DECIMAL(18, 5)  = 0 ,    
+        @VoucherAmount DECIMAL(18, 5)  = 0 ,    
+        @RecoinAmount DECIMAL(18, 5)  = 0 ,    
+        @SlCardAo BIGINT = 0 ,    
+        @VoucherCount INT  = 0 ,    
+        @TienThe DECIMAL(18, 5)  = 0 ,    
+        @LuongKhachPhucVu BIGINT = 0 ,    
+        @SLHoaDonDo BIGINT = 0 ,    
+        @TienHoaDonDo DECIMAL(18, 5)   = 0 ,    
+        @SlKhachnuocngoai BIGINT = 0 ,    
+        @slTreem BIGINT = 0 ,    
+        @slKhachnam BIGINT = 0 ,    
+        @slKhachnu BIGINT = 0 ,    
+        @Dangorder DECIMAL(18, 5) = 0 ,    
+        @SLDangorder BIGINT = 0 ,    
+        @Dathanhtoan DECIMAL(18, 5) = 0 ,    
+        @SLDathanhtoan BIGINT = 0 ,    
+        @CoVat DECIMAL(18, 5) = 0 ,    
+        @VatCountQuantity BIGINT = 0 ,    
+        @VatAmount BIGINT = 0 ,    
+        @CoHoadon DECIMAL(18, 5) = 0 ,    
+        @Trahang DECIMAL(18, 5) = 0 ,    
+        @SLTrahang BIGINT = 0 ,    
+        @SLCoHoadon BIGINT = 0 ,    
+        @Tiepkhach DECIMAL(18, 5) = 0 ,    
+        @SLTiepkhach BIGINT = 0 ,    
+        @DebtCounBill INT = 0 ,    
+        @DebtAmount DECIMAL(18, 5) = 0 ,    
+        @Tongdoanhthu DECIMAL(18, 5)   = 0 ,    
+        @TotalDiscount DECIMAL(18, 5)   = 0 ,    
+        @CurId BIGINT ,    
+        @Dem BIGINT = 1 ,    
+        @SlPhieu BIGINT = 0 ,    
+        @SlTienmat BIGINT = 0 ,    
+        @SlCard BIGINT = 0 ,    
+        @SlPhieuHuy BIGINT ,    
+        @CostPrice DECIMAL(18, 5)                     
+    SELECT  @CurId = CurId    
+    FROM    dbo.Currency    
+    WHERE   CurIsDefault = 1                                            
+    CREATE TABLE #ResultTmp    
+        (    
+          AutiId INT IDENTITY(1, 1) ,    
+          Number NVARCHAR(100) ,    
+          Name NVARCHAR(200) ,    
+          ReceipAmount DECIMAL(18, 5) ,    
+          PaymentAmount DECIMAL(18, 5) ,    
+          Description NVARCHAR(200) ,    
+          Title BIT DEFAULT 0 ,    
+          ReportNumber INT DEFAULT ( 0 ) ,    
+          Tab INT DEFAULT ( 1 ) ,    
+          BustId INT ,    
+          KeyWord VARCHAR(100) DEFAULT ( '' ) ,    
+          SubKey NVARCHAR(200) DEFAULT ( '' ) ,    
+          Bold BIT DEFAULT 0 ,    
+          FontSize BIGINT DEFAULT 0    
+        )                              
+                        
+    SELECT DISTINCT    
+            obj.ObjId    
+    INTO    #tblORG    
+    FROM    dbo.iObject obj    
+            JOIN dbo.OrganiZation org ON obj.ObjId = org.ObjId    
+    WHERE   obj.ObjIsOrg = 1    
+            AND org.ObjIsInterNal = 1    
+            AND ( ISNULL(@SystemKey, '') = ''    
+                  OR ObjNo LIKE +'%' + @SystemKey + '%'    
+                  OR org.ObjBussinessName LIKE +'%' + @SystemKey + '%'    
+                )    
+            AND obj.ObjId IN (    
+            SELECT  Value    
+            FROM    dbo.fn_Sys_SplitString(@LstBranchId, ';') )          
+    SELECT  tk.TicketID    
+    INTO    #tmpListTicket    
+    FROM    dbo.Ticket tk    
+            JOIN dbo.TicketExtend ext ON tk.TicketID = ext.TicketId    
+            JOIN #tblORG org ON ext.OrgId = org.ObjId    
+    WHERE   ( @CounterId IS NULL    
+              OR CoutID = @CounterId    
+            )    
+            AND ( ( TkCloseDate >= @FromDate    
+                  AND TkCloseDate <= @ToDate    
+                  )    
+                  OR ( TkCloseDate IS NULL    
+                       AND TkCreateDate BETWEEN @FromDate AND @ToDate    
+                     )    
+                )    
+            AND ( @BustId IS NULL    
+                  OR BustId = @BustId    
+                )    
+            AND ( @TkeShift IS NULL    
+                  OR ext.TkeShift = @TkeShift    
+                )    
+            AND ( @AreID IS NULL    
+                  OR AreID = @AreID    
+                )    
+    GROUP BY tk.TicketID                        
+                                             
+    IF EXISTS ( SELECT  *    
+                FROM    dbo.Users    
+                WHERE   UserId = @UserId    
+                        AND IsSpecial = 1 )     
+        DELETE  #tmpListTicket    
+        FROM    #tmpListTicket a    
+                JOIN dbo.Ticket b ON a.TicketID = b.TicketID    
+        WHERE   b.TkIsHide = 1                                                            
+                                                              
+    SELECT  T.TicketID    
+    INTO    #tmpInvoice1    
+    FROM    #tmpListTicket T    
+            INNER JOIN dbo.RetInvoice_Ticket V ON T.TicketID = V.TicketID    
+            INNER JOIN dbo.Ticket tk ON T.TicketID = tk.TicketID    
+    WHERE   TkIsCancel = 0    
+            AND TkIsCash = 1    
+    GROUP BY T.TicketID                                                        
+                                                  
+    SELECT  @CoHoadon = SUM(TkPaymentAmount) ,    
+            @SLCoHoadon = COUNT(IV.TicketID)    
+    FROM    #tmpInvoice1 IV    
+            JOIN dbo.Ticket RT ON IV.TicketID = RT.TicketID                             
+    SELECT  CurId ,    
+            CurName ,    
+            CAST (0 AS DECIMAL(18, 5)) AS BaseAmount ,    
+            CAST (0 AS DECIMAL(18, 5)) AS Amount ,    
+            CAST(NULL AS BIGINT) AS Quantity    
+    INTO    #CUR    
+    FROM    dbo.Currency    
+    WHERE   CurIsActive = 1                       
+    SELECT  CT.CurId ,    
+            SUM(CT.TkpAmount) AS Amount ,    
+            SUM(CT.TkpCurAmount) AS BaseAmount ,    
+            LSP.TicketID    
+    INTO    #CurTmp    
+    FROM    #tmpListTicket LSP    
+            INNER JOIN dbo.TicketPayment CT ON LSP.TicketID = CT.TicketID    
+            INNER JOIN #CUR CUR ON CT.CurId = CUR.CurId    
+            INNER JOIN dbo.Ticket tk ON LSP.TicketID = tk.TicketID    
+    WHERE   tk.TkIsCash = 1    
+            AND CT.PamId = 1    
+            AND ISNULL(TkpCardNo, '') = ''    
+    GROUP BY CT.CurId ,    
+            LSP.TicketID                                                        
+    SELECT  CurId ,    
+            SUM(Amount) AS Amount ,    
+            SUM(BaseAmount) AS BaseAmount ,    
+            COUNT(*) AS Quantity    
+    INTO    #CurTmp1    
+    FROM    #CurTmp    
+    GROUP BY CurId                                 
+                                                       
+    UPDATE  CUR    
+    SET     BaseAmount = TMP.BaseAmount ,    
+            Amount = TMP.Amount ,    
+            Quantity = TMP.Quantity    
+    FROM    #CUR CUR    
+            JOIN #CurTmp1 TMP ON CUR.CurId = TMP.CurId                       
+    SELECT  @SlTienmat = SUM(Quantity)    
+    FROM    #CUR                                   
+    SELECT  CartNo ,    
+            CAST (0 AS DECIMAL(18, 5)) AS BaseAmount ,    
+            CAST (0 AS DECIMAL(18, 5)) AS Amount ,    
+            CAST(NULL AS BIGINT) AS Quantity    
+    INTO    #CardTypeTmp    
+    FROM    dbo.CardType a    
+    WHERE   CartIsActive = 1                                
+                                                                  
+    SELECT  CT.CartNo ,    
+            SUM(CT.TkpAmount) AS Amount ,    
+            SUM(CT.TkpCurAmount) AS BaseAmount ,    
+            LSP.TicketID    
+    INTO    #TmpCard    
+    FROM    #tmpListTicket LSP    
+            INNER JOIN dbo.TicketPayment CT ON LSP.TicketID = CT.TicketID    
+            INNER JOIN #CardTypeTmp CAT ON CAT.CartNo = CT.CartNo    
+            INNER JOIN dbo.Ticket tk ON LSP.TicketID = tk.TicketID    
+            LEFT JOIN dbo.iPaymentMethod pay ON pay.PamId = CT.PamId    
+    WHERE   tk.TkIsCash = 1    
+  AND ISNULL(pay.PamIsCash, 0) = 0    
+    GROUP BY CT.CartNo ,    
+            LSP.TicketID                                                         
+                 
+    SELECT  CartNo ,    
+            SUM(Amount) AS Amount ,    
+            SUM(BaseAmount) BaseAmount ,    
+            COUNT(*) AS Quantity    
+    INTO    #TmpCard1    
+    FROM    #TmpCard    
+    GROUP BY CartNo                                                
+                                                                  
+    UPDATE  CT    
+    SET     BaseAmount = TMP.BaseAmount ,    
+            Amount = TMP.Amount ,    
+            Quantity = TMP.Quantity    
+    FROM    #CardTypeTmp CT    
+            JOIN #TmpCard1 TMP ON CT.CartNo = TMP.CartNo                    
+    SELECT  @SlCard = SUM(Quantity)    
+    FROM    #CardTypeTmp                       
+    DROP TABLE    #TmpCard ,#TmpCard1                                                                 
+                                                     
+                                                         
+    SELECT  @Tienmat = SUM(CASE WHEN PamId IN ( 1, 4 )    
+                                     AND ISNULL(CT.TkpCardNo, '') = ''    
+                                THEN CT.TkpAmount    
+                                ELSE 0    
+                           END) ,    
+            @VoucherAmount = SUM(CASE WHEN PamId = 1    
+                                           AND ISNULL(CT.TkpCardNo, '') <> ''    
+                                      THEN CT.TkpAmount    
+                                      ELSE 0    
+                                 END) ,  
+            @VoucherCount = SUM(CASE WHEN PamId = 1    
+                                           AND ISNULL(CT.TkpCardNo, '') <> ''    
+                                      THEN 1    
+                                      ELSE 0    
+                                 END) ,      
+            @TienThe = SUM(CASE WHEN PamId IN ( 5, 6, 3 ) THEN TkpAmount    
+                                ELSE 0    
+                           END) ,    
+            @RecoinAmount = SUM(CASE WHEN PamId = 8 THEN TkpAmount    
+                                     ELSE 0    
+                                END)    
+    FROM    #tmpListTicket LSP    
+            INNER JOIN dbo.TicketPayment CT ON LSP.TicketID = CT.TicketID    
+            INNER JOIN dbo.Currency C ON C.CurId = CT.CurId    
+            INNER JOIN dbo.Ticket tk ON LSP.TicketID = tk.TicketID    
+    WHERE   tk.TkIsCash = 1                                             
+                                           
+                                                                   
+    SELECT  @Tiepkhach = SUM(CASE WHEN TkIsGuest = 1    
+                                       AND TkIsCancel <> 1 THEN TkItemAmout    
+                                  ELSE 0    
+                             END) ,    
+            @SLTiepkhach = SUM(CASE WHEN TkIsGuest = 1    
+                                         AND TkIsCancel <> 1 THEN 1    
+                                    ELSE 0    
+                               END) ,    
+            @LuongKhachPhucVu = SUM(CASE WHEN TkCustomerQuantity > 0    
+                                              AND TkIsCancel = 0    
+                                         THEN TkCustomerQuantity    
+                                         ELSE 0    
+                                    END) ,    
+            @SlKhachnuocngoai = SUM(TkForeignQuantity) ,    
+            @slTreem = SUM(TkChildrenQuantity) ,    
+            @slKhachnam = SUM(TkMaleQuantity) ,    
+            @Tienhang = SUM(CASE WHEN TkIsCancel = 0 THEN TkItemAmout    
+                                 ELSE 0    
+                            END) ,    
+            @Dangorder = SUM(CASE WHEN TkCloseDate IS NULL    
+                                       AND TkIsCash <> 1    
+                                       AND TkIsCancel <> 1    
+                                  THEN TkPaymentAmount    
+                                  ELSE 0    
+                             END) ,    
+            @SLDangorder = SUM(CASE WHEN TkCloseDate IS NULL    
+                                         AND TkIsCash <> 1    
+                                         AND TkIsCancel <> 1 THEN 1    
+                                    ELSE 0    
+                               END) ,    
+            @DiscountVIP = SUM(CASE WHEN TkIsCancel <> 1    
+                                         AND TkIsGuest <> 1    
+                                         AND ISNULL(RpcNo, '') <> ''    
+                                    THEN TkTotalDiscount    
+                                    ELSE 0    
+                               END) ,    
+            @DiscountVIPCount = SUM(CASE WHEN TkIsCancel <> 1    
+                                              AND TkIsGuest <> 1    
+                                              AND TkTotalDiscount > 0    
+                                              AND ISNULL(RpcNo, '') <> ''    
+                                         THEN 1    
+                                         ELSE 0    
+                                    END) ,    
+            @OtherDiscount = SUM(CASE WHEN TkIsCancel <> 1    
+                                           AND TkIsGuest <> 1    
+                                           AND ISNULL(RpcNo, '') = ''    
+                                      THEN TkTotalDiscount    
+                                      ELSE 0    
+                                 END) ,    
+            @OtherDiscountCount = SUM(CASE WHEN TkIsCancel <> 1    
+                                                AND TkIsGuest <> 1    
+                                                AND TkTotalDiscount > 0    
+                                                AND ISNULL(RpcNo, '') = ''    
+                                           THEN 1    
+                                           ELSE 0    
+                                      END) ,    
+            @DebtCounBill = COUNT(CASE WHEN TkIsCash = 1    
+                                            AND TkIsCancel <> 1    
+                                            AND TkIsGuest <> 1    
+                                            AND TkPaymentAmount > TkPaidAmount    
+                                       THEN 1    
+                                       ELSE 0    
+                                  END) ,    
+            @DebtAmount = SUM(CASE WHEN TkIsCash = 1    
+                                        AND TkIsCancel <> 1    
+                                        AND TkIsGuest <> 1    
+                                        AND TkPaymentAmount > TkPaidAmount    
+                                   THEN TkPaymentAmount - TkPaidAmount    
+                                   ELSE 0    
+                              END) ,    
+            @Dathanhtoan = SUM(CASE WHEN TkIsCash = 1    
+                                         AND TkIsCancel <> 1    
+                                         AND TkIsGuest <> 1    
+                                    THEN TkPaymentAmount    
+                                    ELSE 0    
+                               END) ,    
+            @SLDathanhtoan = SUM(CASE WHEN TkIsCash = 1    
+                                           AND TkIsCancel <> 1    
+                                           AND TkIsGuest <> 1 THEN 1    
+                                      ELSE 0    
+                                 END) ,    
+            @CoVat = SUM(CASE WHEN ISNULL(TkVatAmount, 0) > 0    
+                                   AND TkIsCancel <> 1    
+                                   AND TkIsGuest <> 1 THEN TkPaymentAmount    
+                              ELSE 0    
+                         END) ,    
+            @VatCountQuantity = SUM(CASE WHEN ISNULL(TkVatAmount, 0) > 0    
+                                              AND TkIsCancel <> 1    
+                                              AND TkIsGuest <> 1 THEN 1    
+                                         ELSE 0    
+                                    END) ,    
+            @VatAmount = SUM(CASE WHEN TkIsCancel <> 1    
+                                  THEN ISNULL(TkVatAmount, 0)    
+                                  ELSE 0    
+                             END) ,    
+            @SlPhieu = SUM(CASE WHEN TkIsCancel = 0 THEN 1    
+                                ELSE 0    
+                           END) ,    
+            @SlPhieuHuy = SUM(CASE WHEN TkIsCancel = 1 THEN 1    
+                                   ELSE 0    
+                              END)    
+    FROM    #tmpListTicket t    
+            JOIN dbo.Ticket tk ON tk.TicketID = t.TicketID        
+               
+            /*Lấy tiền hàng theo tổng chi tiết của phiếu       
+    SET @Tienhang = ( SELECT    SUM(td.TkdItemAmount)        
+                      FROM      #tmpListTicket t        
+                       JOIN dbo.Ticket tk ON tk.TicketID = t.TicketID        
+                                LEFT JOIN dbo.TicketDetail td ON td.TicketID = tk.TicketID        
+                      WHERE     tk.TkIsCancel = 0        
+                    )        
+         
+            */        
+            print @OtherDiscountCount  
+    SET @OtherDiscount = ROUND(@OtherDiscount, 0)          
+    SELECT  CartId ,    
+            CAST (0 AS DECIMAL(18, 5)) AS BaseAmount ,    
+            CAST (0 AS DECIMAL(18, 5)) AS Amount ,    
+            CAST(NULL AS BIGINT) AS Quantity    
+    INTO    #CTV    
+    FROM    dbo.CardType    
+    WHERE   CartIsActive = 1    
+            AND CartIsVitual = 1                                                       
+    SELECT  CAT.CartId ,    
+            SUM(CT.TkpAmount) AS Amount ,    
+            SUM(CT.TkpCurAmount) AS BaseAmount ,    
+            LSP.TicketID    
+    INTO    #TmpCardV    
+    FROM    #tmpListTicket LSP    
+            INNER JOIN dbo.TicketPayment CT ON LSP.TicketID = CT.TicketID    
+            INNER JOIN PromoCard a ON CT.TkpCardNo = a.RpcNo    
+            INNER JOIN CustomerCard b ON a.RehId = b.CartId    
+            INNER JOIN #CTV CAT ON CAT.CartId = b.CarttId    
+            INNER JOIN dbo.Ticket tk ON LSP.TicketID = tk.TicketID    
+    WHERE   tk.TkIsCash = 1    
+            AND PamId = 8    
+    GROUP BY CAT.CartId ,    
+            LSP.TicketID            
+    SELECT  CartId ,    
+            SUM(Amount) AS Amount ,    
+            SUM(BaseAmount) BaseAmount ,    
+            COUNT(*) AS Quantity    
+    INTO    #TmpCardV1    
+    FROM    #TmpCardV    
+    GROUP BY CartId                                                                      
+    UPDATE  CT    
+    SET     BaseAmount = TMP.BaseAmount ,    
+            Amount = TMP.Amount ,    
+            Quantity = TMP.Quantity    
+    FROM    #CTV CT    
+            JOIN #TmpCardV1 TMP ON CT.CartId = TMP.CartId                                             
+    SELECT  @SlCardAo = SUM(Quantity)    
+    FROM    #CTV                           
+    DROP TABLE    #TmpCardV ,#TmpCardV1   , #CTV         
+    SELECT  a.TicketID    
+    INTO    #TH    
+    FROM    #tmpListTicket a    
+            JOIN dbo.TicketDetail b ON a.TicketID = b.TicketID    
+    WHERE   b.IcsId IS NOT NULL    
+    GROUP BY a.TicketID            
+    SELECT  @SLTrahang = COUNT(*)    
+    FROM    #TH a    
+            JOIN dbo.Ticket b ON a.TicketID = b.TicketID          
+    SELECT  @Trahang = SUM(TkdItemAmount)    
+    FROM    #TH a    
+            JOIN dbo.TicketDetail b ON a.TicketID = b.TicketID    
+    WHERE   b.IcsId IS NOT NULL                     
+    DROP TABLE #TH                        
+    SELECT  ReiId    
+    INTO    #tmpInvoice    
+    FROM    #tmpListTicket T    
+            INNER JOIN dbo.RetInvoice_Ticket V ON T.TicketID = V.TicketID    
+            INNER JOIN dbo.Ticket tk ON T.TicketID = tk.TicketID    
+    WHERE   TkIsCancel = 0    
+            AND TkIsCash = 1    
+    GROUP BY ReiId                                                
+                          
+    SELECT  @SLHoaDonDo = COUNT(inv.TicketID) ,    
+            @TienHoaDonDo = SUM(V.ReiAmountAfterTax)    
+    FROM    #tmpInvoice T    
+            INNER JOIN dbo.RetInvoice_Ticket inv ON T.ReiId = inv.ReiId    
+            INNER JOIN dbo.RetInvoice V ON inv.ReiId = V.ReiId                     
+    SELECT  a.TicketID    
+    INTO    #KM    
+    FROM    #tmpListTicket a    
+            JOIN dbo.TicketDetail b ON a.TicketID = b.TicketID    
+    WHERE   b.TkdTotalDiscount = b.TkdItemAmount    
+            AND b.TkdTotalDiscount <> 0    
+            AND b.TkdItemAmount <> 0    
+    GROUP BY a.TicketID                      
+    SELECT  a.TicketID    
+    INTO    #Dis    
+    FROM    #tmpListTicket a    
+            JOIN dbo.Ticket b ON a.TicketID = b.TicketID    
+    WHERE   b.TkTotalDiscount <> 0    
+            AND b.TkItemAmout <> 0    
+            AND b.TkItemAmout <> b.TkTotalDiscount    
+    GROUP BY a.TicketID                                                       
+    SELECT  a.TicketID    
+    INTO    #KMAndGG    
+    FROM    #tmpListTicket a    
+            JOIN #KM b ON a.TicketID = b.TicketID              JOIN #Dis c ON a.TicketID = c.TicketID    
+    GROUP BY a.TicketID         
+    DELETE  b    
+    FROM    #KMAndGG a    
+            JOIN #KM b ON a.TicketID = b.TicketID          
+    DELETE  b    
+    FROM    #KMAndGG a    
+            JOIN #Dis b ON a.TicketID = b.TicketID          
+    SELECT  TicketID ,    
+            CAST(NULL AS DECIMAL(18, 5)) AS Discount ,    
+            CAST(0 AS BIT) AS KM ,    
+            CAST(0 AS BIT) AS GG    
+    INTO    #KMGG    
+    FROM    #tmpListTicket                     
+    UPDATE  a    
+    SET     KM = 1 ,    
+            Discount = c.TkTotalDiscount    
+    FROM    #KMGG a    
+            JOIN #KM b ON a.TicketID = b.TicketID    
+            JOIN dbo.Ticket c ON a.TicketID = c.TicketID                     
+    UPDATE  a    
+    SET     GG = 1 ,    
+            Discount = c.TkTotalDiscount    
+    FROM    #KMGG a    
+            JOIN #Dis b ON a.TicketID = b.TicketID    
+            JOIN dbo.Ticket c ON b.TicketID = c.TicketID                      
+    UPDATE  a    
+    SET     GG = 1 ,    
+            KM = 1 ,    
+            Discount = c.TkTotalDiscount    
+    FROM    #KMGG a    
+            JOIN #KMAndGG b ON a.TicketID = b.TicketID    
+            JOIN dbo.Ticket c ON b.TicketID = c.TicketID                     
+    DELETE  #KMGG    
+    WHERE   GG = 0    
+            AND KM = 0                    
+    DROP TABLE  #Dis, #KM    ,#KMGG   ,#KMAndGG                    
+    SET @slKhachnu = ISNULL(@LuongKhachPhucVu, 0) - ISNULL(@SlKhachnuocngoai,    
+                                                           0)    
+        - ISNULL(@slKhachnam, 0) - ISNULL(@slTreem, 0)                                   
+    SET @TotalDiscount = ISNULL(@DiscountVIP, 0) + ISNULL(@OtherDiscount, 0)    
+        + ISNULL(@Tiepkhach, 0) + ISNULL(@RecoinAmount, 0)    
+        + ISNULL(@VoucherAmount, 0)             
+    SET @Tongdoanhthu = ISNULL(@Tienmat, 0) + ISNULL(@TienThe, 0)    
+        + ISNULL(@TotalDiscount, 0) + ISNULL(@DebtAmount, 0)              
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold ,    
+              FontSize                    
+            )    
+    VALUES  ( 'I' ,    
+              N'TỔNG DOANH THU' ,    
+              @Tongdoanhthu ,    
+              NULL ,    
+              N'V+VI' ,    
+              1 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGDT' ,    
+              '' ,    
+              1 ,    
+              0                    
+            )                   
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey                   
+            )    
+    VALUES  ( 'II' ,    
+              N'TIỀN HÀNG BÁN' ,    
+              @Tienhang ,    
+              NULL ,    
+              N'CHƯA VAT' ,    
+              0 ,    
+              @Dem ,    
+              2 ,    
+              @BustId ,    
+              'TIENHANG' ,    
+              ''                   
+            )                                                    
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey                   
+            )    
+    VALUES  ( 'III' ,    
+              N'VAT HÀNG BÁN' ,    
+              @VatAmount ,    
+              NULL ,    
+              N'' ,    
+              0 ,    
+              @Dem ,    
+              2 ,    
+              @BustId ,    
+              'TIENHANG' ,    
+              ''                   
+            )                   
+ /* phuong phap tru kho theo điều chỉnh: Shabu Ya*/          
+    DECLARE @DescripTion NVARCHAR(MAX)                
+    IF EXISTS ( SELECT  *    
+                FROM    #tblORG    
+                WHERE   ObjId IN ( 2, 13, 15, 21 ) )     
+        BEGIN                  
+    /*Tổng giá vốn trừ nguyên vật liệu tại nguyên vật liệu đã tính trong xuất hàng bán*/                  
+            SELECT  @CostPrice = SUM(a.StjAmount)    
+            FROM    #tblORG org    
+                    JOIN dbo.StockJoin a ON org.ObjId = a.OrgId    
+                    JOIN dbo.Document b ON a.IcDocumentId = b.DocId    
+                    JOIN dbo.vw_Meta_iProduct c ON a.PrdId = c.PrdId    
+                                                   AND c.PrgType = 2    
+            WHERE   b.DoctId <> 15    
+                    AND a.StockStatus = 2    
+                    AND DATEDIFF(DAY, @FromDate, a.StjDocumentDate) >= 0    
+                    AND DATEDIFF(DAY, a.StjDocumentDate, @ToDate) >= 0                    
+                         
+    /*Công thêm nhập điều chỉnh vì có thể xuất nhiều hơn*/                        
+            SELECT  @CostPrice -= ISNULL(SUM(a.StjAmount), 0)    
+            FROM    #tblORG org    
+                    JOIN dbo.StockJoin a ON org.ObjId = a.OrgId    
+                    JOIN dbo.Document b ON a.IcDocumentId = b.DocId    
+                    JOIN dbo.vw_Meta_iProduct c ON a.PrdId = c.PrdId    
+                                                   AND c.PrgType = 2    
+            WHERE   b.DoctId = 7    
+                    AND DATEDIFF(DAY, @FromDate, a.StjDocumentDate) >= 0    
+                    AND DATEDIFF(DAY, a.StjDocumentDate, @ToDate) >= 0                    
+            SET @DescripTion = N'Xuất kho - nhập điều chỉnh'          
+        END                  
+    ELSE     
+        BEGIN                  
+/*Giá v?n bán l? + giá v?n xu?t h?y + giá v?n xu?t s? d?ng*/                  
+            SELECT  @CostPrice = SUM(a.StjAmount)    
+            FROM    #tblORG org    
+                    LEFT JOIN dbo.vw_Int_DocumentInventory doc ON org.ObjId = doc.OrgId    
+                    LEFT JOIN dbo.StockJoin a ON doc.DocId = a.IcDocumentId    
+            WHERE   doc.DoctId IN ( 11, 12, 19 )    
+                    AND DATEDIFF(DAY, @FromDate, doc.DocDocumentDate) >= 0    
+                    AND DATEDIFF(DAY, doc.DocDocumentDate, @ToDate) >= 0    
+                    AND a.StjId IS NOT NULL    
+            SET @DescripTion = N'Xuất bán lẻ + Xuất hủy + Xuất sử dụng'                
+        END                      
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+    Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize ,    
+              Bold                
+            )    
+    VALUES  ( 'IV' ,    
+              N'GIÁ VỐN HÀNG BÁN ' ,    
+              NULL ,    
+              ROUND(@CostPrice, 0) ,    
+              @DescripTion ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'COST' ,    
+              '' ,    
+              8 ,    
+              1                                       
+            )                     
+                    
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                  
+                                    
+            )    
+    VALUES  ( 'V' ,    
+              N'TỔNG GIẢM GIÁ' ,    
+              NULL ,    
+              @TotalDiscount ,    
+              N' (1+2+3+4+5)' ,    
+              1 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGGIAM' ,    
+              '' ,    
+              1                                    
+            )                             
+    INSERT  INTO #ResultTmp    
+            ( Number ,                Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize                     
+                                  
+            )    
+    VALUES  ( SPACE(2) + '1' ,    
+              SPACE(2) + N'- Thẻ Vip ' ,    
+              NULL ,    
+              @DiscountVIP ,    
+              CAST(@DiscountVIPCount AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu')    
+              + '  ' ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGGIAM' ,    
+              '7' ,    
+              8                    
+            )               
+                      
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold ,    
+              FontSize                     
+            )    
+    VALUES  ( SPACE(2) + '2' ,    
+              SPACE(2) + N'- Thẻ Recoin ' ,    
+              NULL ,    
+              @RecoinAmount ,    
+              '' ,    
+              0 ,    
+              1 ,    
+              @BustId ,    
+              'THEAO' ,    
+              '' ,    
+              0 ,    
+              8                           
+            )              
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize                    
+            )    
+    VALUES  ( SPACE(2) + '3' ,    
+              SPACE(2) + N'- Phiếu giảm giá' ,    
+              NULL ,    
+              @OtherDiscount ,    
+              CAST(@OtherDiscountCount AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu')    
+     + '  ' ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGGIAM' ,    
+              '7' ,    
+              8                                        
+            )                                    
+                     
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                      
+                                    
+            )    
+    VALUES  ( SPACE(2) + '4' ,    
+              SPACE(2) + N'- Phiếu tiếp khách' ,    
+              NULL ,    
+              @Tiepkhach ,    
+              CAST(@SLTiepkhach AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'PTKHACH' ,    
+              '' ,    
+              0                  
+            )         
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize ,    
+              Bold                 
+            )    
+    VALUES  ( SPACE(2) + '5' ,    
+              SPACE(2) + N'- Giảm giá khác' ,    
+              NULL ,    
+              ROUND(@VoucherAmount, 0) ,    
+              CAST(@VoucherCount AS VARCHAR) + N' Phiếu'   ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'VOUCHERTYPE' ,    
+              '' ,    
+     8 ,    
+              0                  
+                                    
+            )                       
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                  
+            )    
+    VALUES  ( 'VI' ,    
+              N'TIỀN MẶT - THẺ - CÔNG NỢ' ,    
+              ROUND(@Tienmat + @TienThe + ISNULL(@DebtAmount, 0), 0) ,    
+              NULL ,    
+              '' ,    
+              1 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TIENMATTHE' ,    
+              '' ,    
+              1                  
+            )                                           
+    SET @Dem = @Dem + 1                     
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize                  
+                                    
+            )    
+    VALUES  ( SPACE(2) + '1' ,    
+              SPACE(2) + N'Tiền mặt' ,    
+              ROUND(@Tienmat, 0) ,    
+              NULL ,    
+              CAST(@SlTienmat AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TIENMAT' ,    
+              '' ,    
+              8                                       
+            )       
+             /*Chi tiết theo loại tiền */         
+    SELECT  CT.TicketID ,    
+            CT.PamId ,    
+            CT.CartId ,    
+           CT.TkpCardNo ,    
+            CT.CurId ,    
+            SUM(TkpCurAmount) AS TkpCurAmount ,    
+            SUM(CT.TkpAmount) AS TkpAmount ,    
+            c.PamIsCash    
+    INTO    #TicketPaymentTmp    
+    FROM    #tmpListTicket LSP    
+            JOIN dbo.TicketPayment CT ON LSP.TicketID = CT.TicketID    
+            INNER JOIN dbo.Ticket tk ON LSP.TicketID = tk.TicketID    
+            LEFT JOIN dbo.iPaymentMethod c ON c.PamId = CT.PamId    
+    WHERE   tk.TkIsCash = 1    
+    GROUP BY CT.TicketID ,    
+            CT.PamId ,    
+            CT.CartId ,    
+            CT.TkpCardNo ,    
+            CT.CurId ,    
+            c.PamName ,    
+            c.PamIsCash    
+    HAVING  ABS(SUM(CT.TkpAmount)) > 0                                                             
+                                                          
+         
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize                           
+            )    
+            SELECT  SPACE(4) + '1.'    
+                    + +CAST(ROW_NUMBER() OVER ( ORDER BY CurName ) AS NVARCHAR) ,    
+                    SPACE(6) + '.' + CurName + ' ' + ISNULL(c.CartName, '') ,    
+                    ROUND(SUM(a.TkpAmount), 0) ,    
+                    NULL ,    
+                    CAST(COUNT(a.TicketID) AS VARCHAR) + N' '    
+                    + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture),    
+                             N'Phiếu') + ' : '    
+                    + dbo.fn_Meta_FormatCurrency(ROUND(SUM(a.TkpCurAmount), 0),    
+                                                 a.CurId) ,    
+                    0 ,    
+                    1 ,    
+                    @BustId ,    
+                    'TIENMAT' ,    
+                    CurName ,    
+                    8    
+            FROM    #TicketPaymentTmp a    
+                    LEFT  JOIN dbo.Currency b ON b.CurId = a.CurId    
+                    LEFT JOIN dbo.CardType c ON c.CartId = a.CartId    
+            WHERE   a.PamIsCash = 1    
+                    AND ISNULL(a.TkpCardNo, '') = ''    
+            GROUP BY CurName ,    
+                    a.CurId ,    
+                    c.CartName    
+            HAVING  SUM(a.TkpAmount) <> 0        
+              
+                                                            
+    DROP TABLE #CUR,#TicketPaymentTmp                          
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize ,    
+              Bold                 
+            )    
+    VALUES  ( SPACE(2) + '2' ,    
+              SPACE(2) + N'Thẻ' ,    
+              ROUND(@TienThe, 0) ,    
+              NULL ,    
+              CAST(@SlCard AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'THE' ,    
+              '' ,    
+              8 ,    
+              1                  
+                                    
+            )          
+                                                      
+    IF EXISTS ( SELECT  *    
+                FROM    #CardTypeTmp    
+                WHERE   Amount > 0 )     
+        BEGIN                                                              
+            INSERT  INTO #ResultTmp    
+                    ( Number ,    
+                      Name ,    
+                      ReceipAmount ,    
+                      PaymentAmount ,    
+                      Description ,    
+            Title ,    
+                      ReportNumber ,    
+                      Tab ,    
+                      BustId ,    
+                      KeyWord ,    
+                      SubKey ,    
+                      FontSize                                                
+                    )    
+                    SELECT  SPACE(3) + '2.'    
+                            + CAST(ROW_NUMBER() OVER ( ORDER BY CartNo ) AS NVARCHAR) ,    
+                            SPACE(3) + '.' + CartNo ,    
+                            ROUND(Amount, 0) ,    
+                            NULL ,    
+                            CAST(Quantity AS VARCHAR) + N' '    
+                            + ISNULL(dbo.fn_Meta_getNotifiCation('Bill',    
+                                                              @Culture),    
+                                     N'Phiếu') + ' : '    
+                            + dbo.fn_Meta_FormatCurrency(ROUND(BaseAmount, 0),    
+                                                         @CurId) ,    
+                            0 ,    
+                            @Dem ,    
+                            1 ,    
+                            @BustId ,    
+                            'THE' ,    
+                            CartNo ,    
+                            8    
+                    FROM    #CardTypeTmp    
+                    WHERE   Amount > 0                                                    
+        END         
+                 
+                            
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              FontSize ,    
+              Bold                 
+            )    
+    VALUES  ( SPACE(2) + '3' ,    
+              SPACE(2) + N' Công Nợ' ,    
+              ROUND(@DebtAmount, 0) ,    
+              NULL ,    
+              '' ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'NO' ,    
+              '' ,    
+              8 ,    
+              1                  
+                                    
+            )       
+                                                                 
+    IF EXISTS ( SELECT  *    
+                FROM    #tmpListTicket a                          JOIN dbo.DebtInfomation b ON b.TicketID = a.TicketID )     
+        BEGIN                                                              
+            INSERT  INTO #ResultTmp    
+                    ( Number ,    
+                      Name ,    
+                      ReceipAmount ,    
+                      PaymentAmount ,    
+                      Description ,    
+                      Title ,    
+                      ReportNumber ,    
+                      Tab ,    
+                      BustId ,    
+                      KeyWord ,    
+                      SubKey ,    
+                      FontSize                                                
+                    )    
+                    SELECT  SPACE(3) + '3.'    
+                            + CAST(ROW_NUMBER() OVER ( ORDER BY ISNULL(c.ObjName,    
+                                                              b.ObjName) ) AS NVARCHAR) ,    
+                            SPACE(3) + '.' + ISNULL(c.ObjName, b.ObjName) ,    
+                            ROUND(SUM(b.DebAmount), 0) ,    
+                            NULL ,    
+                            CAST(COUNT(a.TicketID) AS VARCHAR) + N' '    
+                            + ISNULL(dbo.fn_Meta_getNotifiCation('Bill',    
+                                                              @Culture),    
+                                     N'Phiếu') ,    
+                            0 ,    
+                            @Dem ,    
+                            1 ,    
+                            @BustId ,    
+                            'NO' ,    
+                    'NO' ,    
+                            8    
+                    FROM    #tmpListTicket a    
+                            JOIN dbo.vw_Ret_Ticket tk ON tk.TicketID = a.TicketID    
+                            JOIN dbo.DebtInfomation b ON b.TicketID = a.TicketID    
+                            LEFT JOIN dbo.iObject c ON b.ObjId = c.ObjId    
+                    WHERE   tk.TkIsCash = 1    
+                            AND tk.TkIsCancel = 0    
+                    GROUP BY ISNULL(c.ObjName, b.ObjName)                                              
+        END         
+                            
+    DROP TABLE #CardTypeTmp                                  
+    SET @Dem = @Dem + 1                                
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                     
+                                    
+            )    
+    VALUES  ( 'VII' ,    
+              N'Phiếu chưa thanh toán' ,    
+              @Dangorder ,    
+              NULL ,    
+              CAST(@SLDangorder AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'PCTHANHTOAN' ,    
+              '' ,    
+              1                   
+            )                                                   
+    SET @Dem = @Dem + 1                                           
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold               
+            )    
+    VALUES  ( 'VIII' ,    
+              ISNULL(dbo.fn_Meta_getNotifiCation('TicketPaid', @Culture),    
+                     N'Phiếu thanh toán') ,    
+              @Dathanhtoan ,    
+              NULL ,    
+              CAST(@SLDathanhtoan AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'PDTTOAN' ,    
+              '' ,    
+              1                  
+           )                                                            
+                     
+    SET @Dem = @Dem + 1                               
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                   
+            )    
+    VALUES  ( 'IX' ,    
+              ISNULL(dbo.fn_Meta_getNotifiCation('TicketCancel', @Culture),    
+                     N'Phiếu hủy') ,    
+              NULL ,    
+              ISNULL(@SlPhieuHuy, 0) ,    
+              CAST(@SlPhieuHuy AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'PHUY' ,    
+              '' ,    
+              1                  
+            )                        
+    SET @Dem = @Dem + 1                                        
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+         ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                  
+                                  
+            )    
+    VALUES  ( 'X' ,    
+              ISNULL(dbo.fn_Meta_getNotifiCation('HaveAccidentSale', @Culture),    
+                     N'Phiếu có trả hàng') ,    
+              ABS(ISNULL(@Trahang, 0)) ,    
+              NULL ,    
+              CAST(@SLTrahang AS VARCHAR) + N' '    
+              + ISNULL(dbo.fn_Meta_getNotifiCation('Bill', @Culture), N'Phiếu') ,    
+              0 ,    
+              @Dem ,    
+              2 ,    
+              @BustId ,    
+              'PCTHANG' ,    
+              '' ,    
+              1                  
+            )                                     
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                  
+            )    
+    VALUES  ( 'XI' ,    
+              ISNULL(dbo.fn_Meta_getNotifiCation('BillHaveValue', @Culture),    
+                     N'Phiếu có giá trị') ,    
+              CAST(@SlPhieu AS VARCHAR) ,    
+              NULL ,    
+              CAST(@SlPhieu AS VARCHAR) ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGKHACH' ,    
+              '' ,    
+              1                  
+            )                        
+    SET @Dem = @Dem + 1                        
+    INSERT  INTO #ResultTmp    
+            ( Number ,    
+              Name ,    
+              ReceipAmount ,    
+              PaymentAmount ,    
+              Description ,    
+              Title ,    
+              ReportNumber ,    
+              Tab ,    
+              BustId ,    
+              KeyWord ,    
+              SubKey ,    
+              Bold                  
+            )    
+    VALUES  ( 'XII' ,    
+              ISNULL(dbo.fn_Meta_getNotifiCation('TotalCustomers', @Culture),    
+                     N'Tổng khách') ,    
+              CAST(@LuongKhachPhucVu AS VARCHAR) ,    
+              NULL ,    
+              CAST(@LuongKhachPhucVu AS VARCHAR) ,    
+              0 ,    
+              @Dem ,    
+              1 ,    
+              @BustId ,    
+              'TONGKHACH' ,    
+              '' ,    
+              1                   
+            )                         
+    SELECT  * ,    
+            CASE Title    
+              WHEN 1 THEN '#FF00E6FF' /*KHACH THIEU NO*/    
+            END AS Color    
+    FROM    #ResultTmp    
+    ORDER BY AutiId                  
+    DROP TABLE #ResultTmp   

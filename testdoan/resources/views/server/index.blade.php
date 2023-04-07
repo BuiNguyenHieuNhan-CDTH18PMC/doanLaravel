@@ -79,8 +79,8 @@
                 <div id="Introduce" class="collapse" aria-labelledby="headingPages" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <h6 class="collapse-header"></h6>
-                        <a class="collapse-item" href="/introduce">Danh sách câu hỏi</a>
-                        <a class="collapse-item" href="/form-add-introduce">Tạo câu hỏi</a>
+                        <a class="collapse-item" href="/danh-sach-cau-hoi">Danh sách câu hỏi</a>
+                        <a class="collapse-item" href="/form-diencauhoi">Tạo câu hỏi</a>
                         <div class="collapse-divider"></div>
                     </div>
                 </div>
@@ -96,8 +96,8 @@
                 <div id="mon" class="collapse" aria-labelledby="headingPages" data-parent="#accordionSidebar">
                     <div class="bg-white py-2 collapse-inner rounded">
                         <h6 class="collapse-header"></h6>
-                        <a class="collapse-item" href="/introduce">Danh sách môn</a>
-                        <a class="collapse-item" href="/form-add-introduce">Thêm môn mới</a>
+                        <a class="collapse-item" href="/danh-sach-mon">Danh sách môn</a>
+                        <a class="collapse-item" href="/form-monhoc">Thêm môn mới</a>
                         <div class="collapse-divider"></div>
                     </div>
                 </div>
@@ -219,7 +219,7 @@
     </script>
     <script src="../fontend/vendor/jquery/jquery.min.js"></script>
     <script src="../fontend/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-
+    <script src="js/addons/rating.js"></script>
     <!-- Core plugin JavaScript-->
     <script src="../fontend/vendor/jquery-easing/jquery.easing.min.js"></script>
 
